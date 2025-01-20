@@ -112,6 +112,9 @@ public:
 	AllocatedImage _drawImage;
 	VkExtent2D _drawExtent;
 
+	AllocatedImage _drawImage;
+	AllocatedImage _depthImage;
+
 	DescriptorAllocator globalDescriptorAllocator;
 
 	VkDescriptorSet _drawImageDescriptors;
