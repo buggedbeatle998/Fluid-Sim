@@ -147,6 +147,8 @@ public:
 
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
+	int counter = 0;
+
 private:
 
 	void init_vulkan();

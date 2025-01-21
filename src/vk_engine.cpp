@@ -723,14 +723,10 @@ void VulkanEngine::init_default_data() {
     rect_indices[4] = 1;
     rect_indices[5] = 3;
 
-    rectangle = uploadMesh(rect_indices, rect_vertices);
-
     testMeshes = loadGltfMeshes(this, "..\\..\\assets\\basicmesh.glb").value();
 
     //delete the rectangle data on engine shutdown
     _mainDeletionQueue.push_function([&]() {
-        destroy_buffer(rectangle.indexBuffer);
-        destroy_buffer(rectangle.vertexBuffer);
         for (auto& _mesh : testMeshes) {
             destroy_buffer(_mesh->meshBuffers.indexBuffer);
             destroy_buffer(_mesh->meshBuffers.vertexBuffer);
@@ -900,6 +896,11 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     //vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
 
+    ////launch a draw command to draw 3 vertices
+    //vkCmdDraw(cmd, 3, 1, 0, 0);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
+
     //set dynamic viewport and scissor
     VkViewport viewport = {};
     viewport.x = 0;
@@ -919,23 +920,19 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    ////launch a draw command to draw 3 vertices
-    //vkCmdDraw(cmd, 3, 1, 0, 0);
-
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
-
     GPUDrawPushConstants push_constants;
-    push_constants.worldMatrix = glm::mat4{ 1.f };
-    push_constants.vertexBuffer = rectangle.vertexBufferAddress;
+    //push_constants.worldMatrix = glm::mat4{ 1.f };
+    //push_constants.vertexBuffer = rectangle.vertexBufferAddress;
 
-    vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
-    vkCmdBindIndexBuffer(cmd, rectangle.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    //vkCmdPushConstants(cmd, _meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
+    //vkCmdBindIndexBuffer(cmd, rectangle.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-    vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+    //vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 
     push_constants.vertexBuffer = testMeshes[2]->meshBuffers.vertexBufferAddress;
 
-    glm::mat4 view = glm::translate(glm::vec3{ 0,0,-5 });
+    glm::mat4 view = glm::translate(glm::vec3{ 0, 0, -5 });
+    view = glm::rotate(view, 0.01f * counter++, glm::vec3{ 0, 1, 0 });
     // camera projection
     glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_drawExtent.width / (float)_drawExtent.height, 10000.f, 0.1f);
 
