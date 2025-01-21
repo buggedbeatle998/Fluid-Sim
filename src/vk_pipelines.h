@@ -43,5 +43,7 @@ public:
 
     void set_depth_format(VkFormat format);
 
+    void enable_depthtest(bool depthWriteEnable, VkCompareOp op);
+
     void disable_depthtest();
 };

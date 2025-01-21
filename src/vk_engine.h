@@ -109,7 +109,6 @@ public:
 	VmaAllocator _allocator;
 
 	//draw resources
-	AllocatedImage _drawImage;
 	VkExtent2D _drawExtent;
 
 	AllocatedImage _drawImage;
