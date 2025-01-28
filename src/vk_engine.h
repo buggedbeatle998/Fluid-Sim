@@ -61,8 +61,9 @@ public:
 
 	bool bUseValidationLayers{ true };
 	bool _isInitialized{ false };
-	int _frameNumber {0};
+	int _frameNumber{ 0 };
 	bool stop_rendering{ false };
+	bool resize_requested{ false };
 	VkExtent2D _windowExtent{ 1700 , 900 };
 
 	struct SDL_Window* _window{ nullptr };
@@ -110,6 +111,7 @@ public:
 
 	//draw resources
 	VkExtent2D _drawExtent;
+	float renderScale{ 1.f };
 
 	AllocatedImage _drawImage;
 	AllocatedImage _depthImage;
@@ -147,7 +149,7 @@ public:
 
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
-	int counter = 0;
+	int counter{ 0 };
 
 private:
 
@@ -158,6 +160,7 @@ private:
 	
 	void create_swapchain(uint32_t width, uint32_t height);
 	void destroy_swapchain();
+	void resize_swapchain();
 
 	void init_descriptors();
 
