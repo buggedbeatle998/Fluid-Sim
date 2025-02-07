@@ -1,0 +1,65 @@
+[33mcommit f3bc42aba6537abcb8b2da1e1475c11997362299[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: beatle <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Fri Jan 31 18:09:58 2025 +0000
+
+    setup for textures
+
+[33mcommit 44d3d29663f5725d81de1f335bf7d91b336d7795[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Thu Jan 30 08:13:44 2025 +0000
+
+     dawd
+
+[33mcommit 47a326f8d53768eff1f8fd4e60fb93babc6d02d0[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Tue Jan 28 00:00:11 2025 +0000
+
+    hfueshf
+
+[33mcommit 32e9575d3fe47276d690ef7066a15b285dec3fd1[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Tue Jan 21 23:12:12 2025 +0000
+
+    removed excess stuff and added rotation
+
+[33mcommit 4a1223281d22e2b2e32186042951fe81a5448804[m
+Author: beatle <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Tue Jan 21 22:05:34 2025 +0000
+
+    ?
+
+[33mcommit 85aa378799b153b6dad1ed3de7b2fc11cdfabf00[m
+Author: beatle <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Mon Jan 20 16:43:55 2025 +0000
+
+    temp
+
+[33mcommit b104bd57ce755852cce8ba6fc24dcf7e84eed3fc[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Sun Jan 19 22:59:32 2025 +0000
+
+    added meshes and models
+
+[33mcommit 4d9f92c49300cd5fea9c70e6ced6be768fee140a[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Tue Jan 14 23:18:52 2025 +0000
+
+    shaders fully working
+
+[33mcommit 64e412a732cb5c7bb2533d49cc1d527ab46e4776[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Sun Jan 12 13:50:22 2025 +0000
+
+    added IMGUI
+
+[33mcommit dda4278f0cf4ffab29f5cd2e44654eca39900d00[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Sun Jan 5 22:46:15 2025 +0000
+
+    did shaders but not complete
+
+[33mcommit 1d3927811f731392d31a64f17e298959159a42b3[m
+Author: buggedbeatle998 <118904398+buggedbeatle998@users.noreply.github.com>
+Date:   Sun Jan 5 20:28:10 2025 +0000
+
+    initial commit
