@@ -66,6 +66,7 @@ struct GPUDrawPushConstants {
     glm::mat4 worldMatrix;
     VkDeviceAddress vertexBuffer;
 };
+<<<<<<< HEAD
 
 enum class MaterialPass :uint8_t {
     MainColor,
@@ -119,3 +120,5 @@ struct Node : public IRenderable {
         }
     }
 };
+=======
+>>>>>>> parent of d7051f2 (some texture stuff)

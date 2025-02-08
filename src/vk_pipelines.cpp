@@ -180,6 +180,14 @@ void PipelineBuilder::set_multisampling_none()
     _multisampling.alphaToOneEnable = VK_FALSE;
 }
 
+void PipelineBuilder::disable_blending()
+{
+    // default write mask
+    _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    // no blending
+    _colorBlendAttachment.blendEnable = VK_FALSE;
+}
+
 void PipelineBuilder::set_color_attachment_format(VkFormat format)
 {
     _colorAttachmentformat = format;
@@ -217,14 +225,6 @@ void PipelineBuilder::disable_depthtest()
     _depthStencil.back = {};
     _depthStencil.minDepthBounds = 0.f;
     _depthStencil.maxDepthBounds = 1.f;
-}
-
-void PipelineBuilder::disable_blending()
-{
-    // default write mask
-    _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    // no blending
-    _colorBlendAttachment.blendEnable = VK_FALSE;
 }
 
 void PipelineBuilder::enable_blending_additive()

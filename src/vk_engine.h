@@ -65,6 +65,7 @@ struct GPUSceneData {
 	glm::vec4 sunlightColor;
 };
 
+<<<<<<< HEAD
 struct GLTFMetallic_Roughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
@@ -117,6 +118,8 @@ struct DrawContext {
 	std::vector<RenderObject> OpaqueSurfaces;
 };
 
+=======
+>>>>>>> parent of d7051f2 (some texture stuff)
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
@@ -219,6 +222,7 @@ public:
 
 	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
+<<<<<<< HEAD
 	AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
 	AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
 	void destroy_image(const AllocatedImage& img);
@@ -241,6 +245,8 @@ public:
 
 	void update_scene();
 
+=======
+>>>>>>> parent of d7051f2 (some texture stuff)
 private:
 
 	void init_vulkan();
