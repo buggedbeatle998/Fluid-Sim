@@ -4,27 +4,72 @@
 
 void Camera::update()
 {
-    glm::mat4 cameraRotation = getRotationMatrix();
+    glm::mat4 cameraRotation = getYawRotationMatrix();
     position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.5f, 0.f));
 }
 
 void Camera::processSDLEvent(SDL_Event& e)
 {
-    if (e.type == SDL_KEYDOWN) {
-        if (e.key.keysym.sym == SDLK_w) { velocity.z = -1; }
-        if (e.key.keysym.sym == SDLK_s) { velocity.z = 1; }
-        if (e.key.keysym.sym == SDLK_a) { velocity.x = -1; }
-        if (e.key.keysym.sym == SDLK_d) { velocity.x = 1; }
+    if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
+        if (e.type == SDL_KEYDOWN) {
+            if (e.key.keysym.sym == SDLK_w) {
+                keys_pressed |= 1;
+            }
+            if (e.key.keysym.sym == SDLK_s) {
+                keys_pressed |= 2;
+            }
+            if (e.key.keysym.sym == SDLK_a) {
+                keys_pressed |= 4;
+            }
+            if (e.key.keysym.sym == SDLK_d) {
+                keys_pressed |= 8;
+            }
+            if (e.key.keysym.sym == SDLK_LSHIFT) {
+                keys_pressed |= 16;
+            }
+            if (e.key.keysym.sym == SDLK_SPACE) {
+                keys_pressed |= 32;
+            }
+        }
+
+        if (e.type == SDL_KEYUP) {
+            if (e.key.keysym.sym == SDLK_w) {
+                keys_pressed &= ~1;
+            }
+            if (e.key.keysym.sym == SDLK_s) {
+                keys_pressed &= ~2;
+            }
+            if (e.key.keysym.sym == SDLK_a) {
+                keys_pressed &= ~4;
+            }
+            if (e.key.keysym.sym == SDLK_d) {
+                keys_pressed &= ~8;
+            }
+            if (e.key.keysym.sym == SDLK_LSHIFT) {
+                keys_pressed &= ~16;
+            }
+            if (e.key.keysym.sym == SDLK_SPACE) {
+                keys_pressed &= ~32;
+            }
+        }
+
+        if (e.key.keysym.sym == SDLK_w || e.key.keysym.sym == SDLK_s) {
+            velocity.z = ((keys_pressed & 2) >> 1) - ((keys_pressed & 1) >> 0);
+        }
+        if (e.key.keysym.sym == SDLK_a || e.key.keysym.sym == SDLK_d) {
+            velocity.x = ((keys_pressed & 8) >> 3) - ((keys_pressed & 4) >> 2);
+        }
+        if (e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_SPACE) {
+            velocity.y = ((keys_pressed & 32) >> 5) - ((keys_pressed & 16) >> 4);
+        }
+
+        if (e.key.keysym.sym == SDLK_u) {
+            unlock_mouse = e.type == SDL_KEYUP ? SDL_TRUE : SDL_FALSE;
+            SDL_SetRelativeMouseMode(unlock_mouse);
+        }
     }
 
-    if (e.type == SDL_KEYUP) {
-        if (e.key.keysym.sym == SDLK_w) { velocity.z = 0; }
-        if (e.key.keysym.sym == SDLK_s) { velocity.z = 0; }
-        if (e.key.keysym.sym == SDLK_a) { velocity.x = 0; }
-        if (e.key.keysym.sym == SDLK_d) { velocity.x = 0; }
-    }
-
-    if (e.type == SDL_MOUSEMOTION) {
+    if (unlock_mouse == SDL_TRUE && e.type == SDL_MOUSEMOTION) {
         yaw += (float)e.motion.xrel / 200.f;
         pitch -= (float)e.motion.yrel / 200.f;
     }
@@ -49,4 +94,11 @@ glm::mat4 Camera::getRotationMatrix()
     glm::quat yawRotation = glm::angleAxis(yaw, glm::vec3{ 0.f, -1.f, 0.f });
 
     return glm::toMat4(yawRotation) * glm::toMat4(pitchRotation);
+}
+
+glm::mat4 Camera::getYawRotationMatrix()
+{
+    glm::quat yawRotation = glm::angleAxis(yaw, glm::vec3{ 0.f, -1.f, 0.f });
+
+    return glm::toMat4(yawRotation);
 }

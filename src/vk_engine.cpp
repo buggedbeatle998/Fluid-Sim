@@ -349,6 +349,7 @@ void VulkanEngine::init()
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
+    SDL_SetRelativeMouseMode(SDL_TRUE);
 
     std::string structurePath = { "..\\..\\assets\\structure.glb" };
     auto structureFile = loadGltf(this, structurePath);
@@ -1106,12 +1107,15 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
         vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
             &copyRegion);
 
-        vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        if (mipmapped) {
+            vkutil::generate_mipmaps(cmd, new_image.image, VkExtent2D{ new_image.imageExtent.width,new_image.imageExtent.height });
+        }
+        else {
+            vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
         });
-
     destroy_buffer(uploadbuffer);
-
     return new_image;
 }
 
@@ -1124,6 +1128,7 @@ void VulkanEngine::destroy_image(const AllocatedImage& img)
 
 void VulkanEngine::cleanup()
 {
+    SDL_SetRelativeMouseMode(SDL_FALSE);
     if (_isInitialized) {
         //make sure the gpu has stopped doing its things
         vkDeviceWaitIdle(_device);
