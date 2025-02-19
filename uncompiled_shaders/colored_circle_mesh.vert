@@ -17,7 +17,7 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer {
 	Vertex vertices[];
 };
 
-layout(std140,set = 0, binding = 0) readonly buffer Offsets {
+layout(std140, set = 0, binding = 1) readonly buffer Offsets {
 	vec2 offs[];
 } offsets;
 
@@ -38,10 +38,10 @@ void main()
 	vec2 off = offsets.offs[gl_VertexIndex];
 	//output data
 	gl_Position = PushConstants.render_matrix * vec4(v.position.xy + off, v.position.z, 1.0f);
-	float x_from_cent = (v.uv_x - 0.5f) * 2;
-	float y_from_cent = (v.uv_y - 0.5f) * 2;
+	//float x_from_cent = (v.uv_x - 0.5f) * 2;
+	//float y_from_cent = (v.uv_y - 0.5f) * 2;
 	//if (x_from_cent + y_from_cent < 1.0f)
-		outColor = v.color.xyz;
+	outColor = v.color.xyz;
 	//else
 	//	outColor = vec3(0, 0, 0);
 	outUV.x = v.uv_x;

@@ -306,9 +306,9 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
 #pragma endregion Buffers
 
 #pragma region Inits
-void VulkanEngine::init(Fluid *fluid_ptr)
+void VulkanEngine::init(Fluid *_fluid)
 {
-    fluid = fluid_ptr;
+    fluid = _fluid;
     // only one engine initialization is allowed with the application.
     assert(loadedEngine == nullptr);
     loadedEngine = this;
@@ -351,7 +351,7 @@ void VulkanEngine::init(Fluid *fluid_ptr)
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetRelativeMouseMode(SDL_FALSE);
 
     /*std::string structurePath = { "..\\..\\assets\\structure.glb" };
     auto structureFile = loadGltf(this, structurePath);
@@ -405,8 +405,13 @@ void VulkanEngine::init_vulkan()
 
     //create the final vulkan device
     vkb::DeviceBuilder deviceBuilder{ physicalDevice };
+    VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_parameters_features = {};
+    shader_draw_parameters_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
+    shader_draw_parameters_features.pNext = nullptr;
+    shader_draw_parameters_features.shaderDrawParameters = VK_TRUE;
+    vkb::Device vkbDevice = deviceBuilder.add_pNext(&shader_draw_parameters_features).build().value();
 
-    vkb::Device vkbDevice = deviceBuilder.build().value();
+    //vkb::Device vkbDevice = deviceBuilder.build().value();
 
     // Get the VkDevice handle used in the rest of a vulkan application
     _device = vkbDevice.device;
@@ -621,7 +626,7 @@ void VulkanEngine::init_descriptors()
     }
     {
         DescriptorLayoutBuilder builder;
-        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _offsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
@@ -654,8 +659,10 @@ void VulkanEngine::init_descriptors()
 
         _frames[i].offsBuffer = create_buffer(sizeof(glm::vec2) * PARTICLE_NUM, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        _mainDeletionQueue.push_function([=, this]() {
+        _mainDeletionQueue.push_function([&, i]() {
+            fmt::print("hi1");
             destroy_buffer(_frames[i].offsBuffer);
+            fmt::print("hi2");
         });
 
         _frames[i]._frameDescriptors = DescriptorAllocatorGrowable{};
@@ -678,7 +685,7 @@ void VulkanEngine::init_pipelines()
     init_particle_pipeline();
     init_mesh_pipeline();
 
-    metalRoughMaterial.build_pipelines(this);
+    //metalRoughMaterial.build_pipelines(this);
 }
 
 void VulkanEngine::init_background_pipelines()
@@ -831,13 +838,13 @@ void VulkanEngine::init_particle_pipeline()
     bufferRange.size = sizeof(GPUDrawPushConstants);
     bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     
-    //VkDescriptorSetLayout setLayouts[] = { _singleImageDescriptorLayout, _offsDescriptorLayout };
+    VkDescriptorSetLayout setLayouts[] = { _offsDescriptorLayout, _singleImageDescriptorLayout };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
     pipeline_layout_info.pPushConstantRanges = &bufferRange;
     pipeline_layout_info.pushConstantRangeCount = 1;
-    pipeline_layout_info.pSetLayouts = &_singleImageDescriptorLayout;// setLayouts;
-    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = setLayouts;
+    pipeline_layout_info.setLayoutCount = 2;
     VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_particlePipelineLayout));
 
     PipelineBuilder pipelineBuilder;
@@ -1222,7 +1229,7 @@ void VulkanEngine::cleanup()
             _frames[i]._deletionQueue.flush();
         }
 
-        metalRoughMaterial.clear_resources(_device);
+        //metalRoughMaterial.clear_resources(_device);
 
         //flush the global deletion queue
         _mainDeletionQueue.flush();
@@ -1439,25 +1446,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     //    writer.update_set(_device, imageSet);
     //}
 
-    //allocate a new uniform buffer for the scene data
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _particlePipeline);
-
-    /*std::array<Vertex, PARTICLE_NUM> rect_vertices;
-    std::array<uint32_t, PARTICLE_NUM> rect_indices;
-
-    for (int i = 0; i < PARTICLE_NUM; i++) {
-        rect_vertices[i].position = { fluid->particles[i]->pos, 0};
-        rect_vertices[i].color = { 1, 1, 1, 1 };
-        rect_indices[i] = i;
-    }
-    rectangle = uploadMesh(rect_indices, rect_vertices);*/
-
-    GPUDrawPushConstants push_constants;
-    push_constants.worldMatrix = glm::mat4{ 1.f } * sceneData.viewproj;
-    push_constants.vertexBuffer = rectangle.vertexBufferAddress;
-    vkCmdPushConstants(cmd, _particlePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
-    vkCmdBindIndexBuffer(cmd, rectangle.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
     void* objectData;
     vmaMapMemory(_allocator, get_current_frame().offsBuffer.allocation, &objectData);
 
@@ -1470,10 +1458,20 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     vmaUnmapMemory(_allocator, get_current_frame().offsBuffer.allocation);
 
+    _offsDescriptors = get_current_frame()._frameDescriptors.allocate(_device, _offsDescriptorLayout);
+
     DescriptorWriter offWriter;
-    offWriter.write_buffer(0, get_current_frame().offsBuffer.buffer, sizeof(glm::vec2) * PARTICLE_NUM, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    offWriter.write_buffer(1, get_current_frame().offsBuffer.buffer, sizeof(glm::vec2) * PARTICLE_NUM, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     offWriter.update_set(_device, _offsDescriptors);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _particlePipelineLayout, 1, 1, &_offsDescriptors, 0, nullptr);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _particlePipeline);
+    GPUDrawPushConstants push_constants;
+    push_constants.worldMatrix = glm::mat4{ 1.f } * sceneData.viewproj;
+    push_constants.vertexBuffer = rectangle.vertexBufferAddress;
+    vkCmdPushConstants(cmd, _particlePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
+    vkCmdBindIndexBuffer(cmd, rectangle.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _particlePipelineLayout, 0, 1, &_offsDescriptors, 0, nullptr);
 
     vkCmdDrawIndexed(cmd, PARTICLE_NUM, 1, 0, 0, 0);
 

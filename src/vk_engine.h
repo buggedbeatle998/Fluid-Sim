@@ -156,7 +156,7 @@ public:
 	static VulkanEngine& Get();
 
 	//initializes everything in the engine
-	void init(Fluid *fluid_ptr);
+	void init(Fluid *_fluid);
 
 	//shuts down the engine
 	void cleanup();
