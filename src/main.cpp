@@ -1,14 +1,18 @@
 #include <vk_engine.h>
+#include <simu.h>
 
 int main(int argc, char* argv[])
 {
+	Fluid fluid;
 	VulkanEngine engine;
 
-	engine.init();	
+	fluid.init();
+	engine.init(&fluid);
 	
 	engine.run();	
 
 	engine.cleanup();	
+	fluid.cleanup();
 
 	return 0;
 }

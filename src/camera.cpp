@@ -4,8 +4,10 @@
 
 void Camera::update()
 {
-    glm::mat4 cameraRotation = getYawRotationMatrix();
-    position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.5f, 0.f));
+    if (movable) {
+        glm::mat4 cameraRotation = getYawRotationMatrix();
+        position += glm::vec3(cameraRotation * glm::vec4(velocity * speed, 0.f));
+    }
 }
 
 void Camera::processSDLEvent(SDL_Event& e)
@@ -29,6 +31,11 @@ void Camera::processSDLEvent(SDL_Event& e)
             }
             if (e.key.keysym.sym == SDLK_SPACE) {
                 keys_pressed |= 32;
+            }
+
+            if (e.key.keysym.sym == SDLK_u) {
+                unlock_mouse = unlock_mouse == SDL_FALSE ? SDL_TRUE : SDL_FALSE;
+                SDL_SetRelativeMouseMode(unlock_mouse);
             }
         }
 
@@ -62,14 +69,9 @@ void Camera::processSDLEvent(SDL_Event& e)
         if (e.key.keysym.sym == SDLK_LSHIFT || e.key.keysym.sym == SDLK_SPACE) {
             velocity.y = ((keys_pressed & 32) >> 5) - ((keys_pressed & 16) >> 4);
         }
-
-        if (e.key.keysym.sym == SDLK_u) {
-            unlock_mouse = e.type == SDL_KEYUP ? SDL_TRUE : SDL_FALSE;
-            SDL_SetRelativeMouseMode(unlock_mouse);
-        }
     }
 
-    if (unlock_mouse == SDL_TRUE && e.type == SDL_MOUSEMOTION) {
+    if (movable && unlock_mouse == SDL_TRUE && e.type == SDL_MOUSEMOTION) {
         yaw += (float)e.motion.xrel / 200.f;
         pitch -= (float)e.motion.yrel / 200.f;
     }
@@ -101,4 +103,8 @@ glm::mat4 Camera::getYawRotationMatrix()
     glm::quat yawRotation = glm::angleAxis(yaw, glm::vec3{ 0.f, -1.f, 0.f });
 
     return glm::toMat4(yawRotation);
+}
+
+void Camera::setMovable(bool toMovable) {
+    movable = toMovable;
 }

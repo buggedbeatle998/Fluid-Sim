@@ -1,0 +1,21 @@
+#define PARTICLE_NUM 16
+
+
+struct Particle {
+	glm::vec2 pos{ 0, 0 };
+	glm::vec2 velocity{ 0, 0 };
+	float mass{ 1 };
+};
+
+class Fluid {
+private:
+	void init_particles_square(uint32_t spacing);
+	
+public:
+	void init();
+
+	void cleanup();
+
+	static const uint32_t particle_num = PARTICLE_NUM;
+	Particle* particles[particle_num];
+};

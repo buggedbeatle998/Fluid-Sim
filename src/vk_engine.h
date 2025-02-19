@@ -11,6 +11,8 @@
 
 #include <camera.h>
 
+#define PARTICLE_NUM 16
+
 
 struct DeletionQueue
 {
@@ -40,6 +42,8 @@ struct FrameData {
 
 	DeletionQueue _deletionQueue;
 	DescriptorAllocatorGrowable _frameDescriptors;
+
+	AllocatedBuffer offsBuffer;
 };
 
 struct ComputePushConstants {
@@ -128,11 +132,17 @@ struct EngineStats {
 	float mesh_draw_time;
 };
 
+class Fluid;
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
 public:
+
+	Fluid *fluid;
+
+	std::array<Vertex, PARTICLE_NUM> rect_vertices;
+	std::array<uint32_t, PARTICLE_NUM> rect_indices;
 
 	bool bUseValidationLayers{ true };
 	bool _isInitialized{ false };
@@ -146,7 +156,7 @@ public:
 	static VulkanEngine& Get();
 
 	//initializes everything in the engine
-	void init();
+	void init(Fluid *fluid_ptr);
 
 	//shuts down the engine
 	void cleanup();
@@ -196,6 +206,9 @@ public:
 	VkDescriptorSet _drawImageDescriptors;
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
 
+	VkDescriptorSet _offsDescriptors;
+	VkDescriptorSetLayout _offsDescriptorLayout;
+
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
 
@@ -219,6 +232,10 @@ public:
 
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
+
+	VkPipelineLayout _particlePipelineLayout;
+	VkPipeline _particlePipeline;
+	ComputeEffect _circler;
 
 	GPUMeshBuffers rectangle;
 
@@ -273,7 +290,8 @@ private:
 
 	void init_pipelines();
 	void init_background_pipelines();
-	void init_triangle_pipeline();
+	//void init_triangle_pipeline();
+	void init_particle_pipeline();
 	void init_mesh_pipeline();
 
 	void init_imgui();
