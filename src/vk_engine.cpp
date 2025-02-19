@@ -660,9 +660,7 @@ void VulkanEngine::init_descriptors()
         _frames[i].offsBuffer = create_buffer(sizeof(glm::vec2) * PARTICLE_NUM, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         _mainDeletionQueue.push_function([&, i]() {
-            fmt::print("hi1");
             destroy_buffer(_frames[i].offsBuffer);
-            fmt::print("hi2");
         });
 
         _frames[i]._frameDescriptors = DescriptorAllocatorGrowable{};
@@ -1701,6 +1699,8 @@ void VulkanEngine::run()
         if (ImGui::Begin("background")) {
 
             ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
+            ImGui::SliderFloat("TL", &fluid->thing1, -5.f, 5.f);
+            ImGui::SliderFloat("spacing", &fluid->thing2, -5.f, 5.f);
 
             ComputeEffect& selected = backgroundEffects[currentBackgroundEffect];
 
@@ -1718,6 +1718,7 @@ void VulkanEngine::run()
         ImGui::Render();
 
         draw();
+        fluid->set_particles_square(1);
 
         //get clock again, compare with start clock
         auto end = std::chrono::system_clock::now();

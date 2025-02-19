@@ -37,7 +37,10 @@ void main()
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
 	vec2 off = offsets.offs[gl_VertexIndex];
 	//output data
+	if (gl_VertexIndex >= 8)
 	gl_Position = PushConstants.render_matrix * vec4(v.position.xy + off, v.position.z, 1.0f);
+	else
+	gl_Position = PushConstants.render_matrix * vec4(v.position.xyz, 1.0f);
 	//float x_from_cent = (v.uv_x - 0.5f) * 2;
 	//float y_from_cent = (v.uv_y - 0.5f) * 2;
 	//if (x_from_cent + y_from_cent < 1.0f)
