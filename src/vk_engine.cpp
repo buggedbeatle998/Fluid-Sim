@@ -303,6 +303,55 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
 
     return newSurface;
 }
+
+GPUMeshBuffers VulkanEngine::uploadMesh(uint32_t *indices, Vertex *vertices, size_t num_elements)
+{
+    const size_t vertexBufferSize = sizeof(Vertex) * num_elements;
+    const size_t indexBufferSize = sizeof(uint32_t) * num_elements;
+
+    GPUMeshBuffers newSurface;
+
+    //create vertex buffer
+    newSurface.vertexBuffer = create_buffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    //find the adress of the vertex buffer
+    VkBufferDeviceAddressInfo deviceAdressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = newSurface.vertexBuffer.buffer };
+    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(_device, &deviceAdressInfo);
+
+    //create index buffer
+    newSurface.indexBuffer = create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    AllocatedBuffer staging = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+    void* data = staging.allocation->GetMappedData();
+
+    // copy vertex buffer
+    memcpy(data, vertices, vertexBufferSize);
+    // copy index buffer
+    memcpy((char*)data + vertexBufferSize, indices, indexBufferSize);
+
+    immediate_submit([&](VkCommandBuffer cmd) {
+        VkBufferCopy vertexCopy{ 0 };
+        vertexCopy.dstOffset = 0;
+        vertexCopy.srcOffset = 0;
+        vertexCopy.size = vertexBufferSize;
+
+        vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
+
+        VkBufferCopy indexCopy{ 0 };
+        indexCopy.dstOffset = 0;
+        indexCopy.srcOffset = vertexBufferSize;
+        indexCopy.size = indexBufferSize;
+
+        vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+        });
+
+    destroy_buffer(staging);
+
+    return newSurface;
+}
 #pragma endregion Buffers
 
 #pragma region Inits
@@ -627,7 +676,7 @@ void VulkanEngine::init_descriptors()
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-        _offsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+        _offsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT);
     }
 
     //allocate a descriptor set for our draw image
@@ -657,7 +706,7 @@ void VulkanEngine::init_descriptors()
             { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 },
         };
 
-        _frames[i].offsBuffer = create_buffer(sizeof(glm::vec2) * PARTICLE_NUM, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        _frames[i].offsBuffer = create_buffer(sizeof(glm::vec2) * PARTICLE_NUM * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         _mainDeletionQueue.push_function([&, i]() {
             destroy_buffer(_frames[i].offsBuffer);
@@ -1014,20 +1063,25 @@ void VulkanEngine::init_imgui()
 }
 
 void VulkanEngine::init_default_data() {
-    std::array<Vertex, PARTICLE_NUM> rect_vertices;
-    std::array<uint32_t, PARTICLE_NUM> rect_indices;
+    Vertex *rect_vertices = new Vertex[PARTICLE_NUM];
+    uint32_t *rect_indices = new uint32_t[PARTICLE_NUM];
+    //std::array<Vertex, PARTICLE_NUM> rect_vertices;
+    //std::array<uint32_t, PARTICLE_NUM> rect_indices;
 
     for (int i = 0; i < PARTICLE_NUM; i++) {
         rect_vertices[i].position = { 0, 0, 0 };
         rect_vertices[i].color = { 1, 1, 1, 1 };
         rect_indices[i] = i;
     }
-    rectangle = uploadMesh(rect_indices, rect_vertices);
+    rectangle = uploadMesh(rect_indices, rect_vertices, PARTICLE_NUM);
 
     _mainDeletionQueue.push_function([&]() {
         destroy_buffer(rectangle.indexBuffer);
         destroy_buffer(rectangle.vertexBuffer);
     });
+
+    delete[] rect_vertices;
+    delete[] rect_indices;
 
     /*testMeshes = loadGltfMeshes(this, "..\\..\\assets\\basicmesh.glb").value();
 
@@ -1449,9 +1503,9 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     glm::vec2* _offs = (glm::vec2*)objectData;
 
-    for (int i = 0; i < PARTICLE_NUM; i++)
+    for (uint32_t i = 0; i < PARTICLE_NUM; i++)
     {
-        _offs[i] = fluid->particles[i]->pos;
+        _offs[i + i] = fluid->particles[i]->pos;
     }
 
     vmaUnmapMemory(_allocator, get_current_frame().offsBuffer.allocation);
@@ -1459,7 +1513,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     _offsDescriptors = get_current_frame()._frameDescriptors.allocate(_device, _offsDescriptorLayout);
 
     DescriptorWriter offWriter;
-    offWriter.write_buffer(1, get_current_frame().offsBuffer.buffer, sizeof(glm::vec2) * PARTICLE_NUM, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    offWriter.write_buffer(1, get_current_frame().offsBuffer.buffer, sizeof(glm::vec2) * PARTICLE_NUM * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     offWriter.update_set(_device, _offsDescriptors);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _particlePipeline);
@@ -1699,8 +1753,8 @@ void VulkanEngine::run()
         if (ImGui::Begin("background")) {
 
             ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
-            ImGui::SliderFloat("TL", &fluid->thing1, -5.f, 5.f);
-            ImGui::SliderFloat("spacing", &fluid->thing2, -5.f, 5.f);
+            //ImGui::SliderFloat("TL", &fluid->thing1, -5.f, 5.f);
+            //ImGui::SliderFloat("spacing", &fluid->thing2, -5.f, 5.f);
 
             ComputeEffect& selected = backgroundEffects[currentBackgroundEffect];
 
@@ -1718,7 +1772,11 @@ void VulkanEngine::run()
         ImGui::Render();
 
         draw();
-        fluid->set_particles_square(1);
+
+        deltaTime = (SDL_GetTicks() - lastTime) / 1000.f;
+
+        lastTime = SDL_GetTicks();
+        //fluid->set_particles_square(0.1);
 
         //get clock again, compare with start clock
         auto end = std::chrono::system_clock::now();

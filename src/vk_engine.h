@@ -11,7 +11,7 @@
 
 #include <camera.h>
 
-#define PARTICLE_NUM 16
+#define PARTICLE_NUM 2500
 
 
 struct DeletionQueue
@@ -139,7 +139,8 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 class VulkanEngine {
 public:
 
-	Fluid *fluid;
+	float deltaTime;
+	double lastTime;
 
 	std::array<Vertex, PARTICLE_NUM> rect_vertices;
 	std::array<uint32_t, PARTICLE_NUM> rect_indices;
@@ -229,6 +230,7 @@ public:
 	void destroy_buffer(const AllocatedBuffer& buffer);
 
 	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+	GPUMeshBuffers uploadMesh(uint32_t *indices, Vertex *vertices, size_t num_elements);
 
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
@@ -276,6 +278,8 @@ public:
 	EngineStats stats;
 
 private:
+
+	Fluid* fluid;
 
 	void init_vulkan();
 	void init_swapchain();

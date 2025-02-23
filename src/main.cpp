@@ -6,7 +6,7 @@ int main(int argc, char* argv[])
 	Fluid fluid;
 	VulkanEngine engine;
 
-	fluid.init();
+	fluid.init(&engine);
 	engine.init(&fluid);
 	
 	engine.run();	
