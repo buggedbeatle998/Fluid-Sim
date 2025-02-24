@@ -211,6 +211,5 @@ void Fluid::cleanup() {
     for (auto& particle : particles) {
         delete particle;
     }
-	//delete[] particles;
 }
 #pragma endregion Fluid
