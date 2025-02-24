@@ -7,11 +7,11 @@ struct Particle {
 	float mass;
 };
 
-layout(binding = 1, set = 0) readonly buffer InputBuffer {
+layout(binding = 0, set = 0) readonly buffer InputBuffer {
 	Particle particles[];
-} sourceData;
+} inputData;
 
-layout(binding = 2, set = 0) writeonly buffer OutputBuffer {
+layout(binding = 1, set = 0) writeonly buffer OutputBuffer {
 	Particle particles[];
 } outputData;
 
@@ -28,6 +28,8 @@ void main()
     //make sure we don't access past the buffer size
     if(gID < opData.particle_count)
     {
-		
+		Particle temp = inputData.particles[gID];
+		temp.pos.y += opData.delta_time;
+		outputData.particles[gID] = temp;
     }
 }

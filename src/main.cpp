@@ -6,13 +6,13 @@ int main(int argc, char* argv[])
 	Fluid fluid;
 	VulkanEngine engine;
 
-	fluid.init(&engine);
 	engine.init(&fluid);
+	fluid.init(&engine);
 	
 	engine.run();	
 
-	engine.cleanup();	
 	fluid.cleanup();
+	engine.cleanup();	
 
 	return 0;
 }

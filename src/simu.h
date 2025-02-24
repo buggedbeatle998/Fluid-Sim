@@ -1,6 +1,10 @@
 #include "VkBootstrap.h"
+#include <vk_engine.h>
 
 #define PARTICLE_NUM 2500
+
+
+class VulkanEngine;
 
 //class DescriptorAllocatorGrowable;
 //class VkDescriptorSet;

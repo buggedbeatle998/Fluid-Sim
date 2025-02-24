@@ -1,5 +1,4 @@
 #include "simu.h"
-#include <vk_engine.h>
 #include <vk_pipelines.h>
 
 #include <glm/gtx/transform.hpp>
@@ -27,7 +26,6 @@ uint16_t isqrt(uint32_t num) {
 }
 #pragma endregion Helpers
 
-class VulkanEngine;
 
 #pragma region Fluid
 #pragma region Inits
@@ -62,12 +60,12 @@ void Fluid::init_buffers() {
     }*/
     {
         DescriptorLayoutBuilder builder;
-        builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _physics_input_descriptor_layout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
     }
     {
         DescriptorLayoutBuilder builder;
-        builder.add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         _physics_output_descriptor_layout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
     }
 
@@ -80,7 +78,7 @@ void Fluid::init_buffers() {
 
         //vkDestroyDescriptorSetLayout(engine->_device, _drawImageDescriptorLayout, nullptr);
         vkDestroyDescriptorSetLayout(engine->_device, _physics_input_descriptor_layout, nullptr);
-        vkDestroyDescriptorSetLayout(engine->_device, _physics_input_descriptor_layout, nullptr);
+        vkDestroyDescriptorSetLayout(engine->_device, _physics_output_descriptor_layout, nullptr);
 
         engine->destroy_buffer(_input_buffer);
         engine->destroy_buffer(_output_buffer);
@@ -194,7 +192,7 @@ void Fluid::physics_step(uint32_t particle_count, float delta_time) {
     _physics_input_descriptors = fluid_allocator.allocate(engine->_device, _physics_input_descriptor_layout);
     {
         DescriptorWriter writer;
-        writer.write_buffer(1, _input_buffer.buffer, sizeof(Particle) * PARTICLE_NUM * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        writer.write_buffer(0, _input_buffer.buffer, sizeof(Particle) * PARTICLE_NUM * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         writer.update_set(engine->_device, _physics_input_descriptors);
     }
 
