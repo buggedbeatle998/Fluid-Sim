@@ -1,5 +1,6 @@
 #include "simu.h"
 #include <vk_pipelines.h>
+#include <vk_initializers.h>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -162,8 +163,18 @@ void Fluid::set_particles_square(float spacing) {
 
 #pragma endregion Inits
 
-#pragma region Physics
-void Fluid::physics_step(uint32_t particle_count, float delta_time) {
+#pragma region Step
+void Fluid::step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time) {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("failed to begin recording command buffer!");
+    }
+    physics_step(particle_count, delta_time);
+}
+
+void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time) {
 
     Config config_data{};
     config_data.particle_count = particle_count;
@@ -204,8 +215,15 @@ void Fluid::physics_step(uint32_t particle_count, float delta_time) {
     vkCmdBindDescriptorSets(engine->get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline_layout, 0, 1, &_physics_output_descriptors, 0, nullptr);
 
     vkCmdPushConstants(engine->get_current_frame()._mainCommandBuffer, _physics_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE, 0, sizeof(Config), &config_data);
+
+    int groupcount = ((PARTICLE_NUM + 255) / 256);
+
+    vkCmdDispatch(engine->get_current_frame()._mainCommandBuffer, groupcount, 1, 1);
+
+
+
 }
-#pragma endregion Physics
+#pragma endregion Step
 
 void Fluid::cleanup() {
     for (auto& particle : particles) {

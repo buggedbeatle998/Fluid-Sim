@@ -52,7 +52,8 @@ public:
 	void init(VulkanEngine *_engine);
 	void set_particles_square(float spacing);
 
-	void physics_step(uint32_t particle_count, float delta_time);
+	void step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time);
+	void physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time);
 
 	void cleanup();
 
