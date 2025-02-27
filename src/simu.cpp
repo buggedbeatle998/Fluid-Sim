@@ -46,6 +46,50 @@ void Fluid::init_bounding_area(float right, float up, float left, float down) {
     bounding_area[3] = down;
 }
 
+void Fluid::init_commands()
+{
+    //create a command pool for commands submitted to the graphics queue.
+    //we also want the pool to allow for resetting of individual command buffers
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(engine->_computeQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+    for (int i = 0; i < FRAME_OVERLAP; i++) {
+
+        VK_CHECK(vkCreateCommandPool(engine->_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool));
+
+        // allocate the default command buffer that we will use for rendering
+        VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_frames[i]._commandPool, 1);
+
+        VK_CHECK(vkAllocateCommandBuffers(engine->_device, &cmdAllocInfo, &_frames[i]._mainCommandBuffer));
+    }
+
+    VK_CHECK(vkCreateCommandPool(engine->_device, &commandPoolInfo, nullptr, &_immCommandPool));
+
+    // allocate the command buffer for immediate submits
+    VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_immCommandPool, 1);
+
+    VK_CHECK(vkAllocateCommandBuffers(engine->_device, &cmdAllocInfo, &_immCommandBuffer));
+
+    _mainDeletionQueue.push_function([=]() {
+        vkDestroyCommandPool(engine->_device, _immCommandPool, nullptr);
+    });
+}
+
+void Fluid::init_syncs() {
+    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
+
+    for (int i = 0; i < FRAME_OVERLAP; i++) {
+        VK_CHECK(vkCreateFence(engine->_device, &fenceCreateInfo, nullptr, &_frames[i]._computeFence));
+
+        VK_CHECK(vkCreateSemaphore(engine->_device, &semaphoreCreateInfo, nullptr, &_frames[i]._computeSemaphore));
+    }
+
+    VK_CHECK(vkCreateFence(engine->_device, &fenceCreateInfo, nullptr, &_immFence));
+    _mainDeletionQueue.push_function([=]() {
+        vkDestroyFence(engine->_device, _immFence, nullptr);
+    });
+}
+
 void Fluid::init_buffers() {
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes =
     {
@@ -71,18 +115,23 @@ void Fluid::init_buffers() {
     }
 
     //_config_buffer = engine->create_buffer(sizeof(Config), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    _input_buffer = engine->create_buffer(sizeof(Particle) * PARTICLE_NUM * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    _output_buffer = engine->create_buffer(sizeof(Particle) * PARTICLE_NUM * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU);
 
-    engine->_mainDeletionQueue.push_function([&]() {
+    for (int i = 0; i < FRAME_OVERLAP; i++) {
+        _frames[i]._input_buffer = engine->create_buffer(sizeof(Particle) * PARTICLE_NUM * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        _frames[i]._output_buffer = engine->create_buffer(sizeof(Particle) * PARTICLE_NUM * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU);
+
+        _mainDeletionQueue.push_function([&, i]() {
+            engine->destroy_buffer(_frames[i]._input_buffer);
+            engine->destroy_buffer(_frames[i]._output_buffer);
+        });
+    }
+
+    _mainDeletionQueue.push_function([&]() {
         fluid_allocator.destroy_pools(engine->_device);
 
         //vkDestroyDescriptorSetLayout(engine->_device, _drawImageDescriptorLayout, nullptr);
         vkDestroyDescriptorSetLayout(engine->_device, _physics_input_descriptor_layout, nullptr);
         vkDestroyDescriptorSetLayout(engine->_device, _physics_output_descriptor_layout, nullptr);
-
-        engine->destroy_buffer(_input_buffer);
-        engine->destroy_buffer(_output_buffer);
     });
 }
 
@@ -164,14 +213,30 @@ void Fluid::set_particles_square(float spacing) {
 #pragma endregion Inits
 
 #pragma region Step
-void Fluid::step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time) {
+void Fluid::step(uint32_t particle_count, float delta_time) {
+    get_current_frame()._deletionQueue.flush();
+    get_current_frame()._frameDescriptors.clear_pools(engine->_device);
+
+    VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
+
+    VK_CHECK(vkResetCommandBuffer(cmd, 0));
+    
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-    }
-    physics_step(particle_count, delta_time);
+    VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+
+    physics_step(cmd, particle_count, delta_time);
+
+    VK_CHECK(vkEndCommandBuffer(cmd));
+
+    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
+
+    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, get_current_frame()._computeSemaphore);
+
+    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
+
+    VK_CHECK(vkQueueSubmit2(engine->_computeQueue, 1, &submit, nullptr));
 }
 
 void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time) {
@@ -189,7 +254,7 @@ void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float de
     }*/
 
     void* particle_data;
-    vmaMapMemory(engine->_allocator, _input_buffer.allocation, &particle_data);
+    vmaMapMemory(engine->_allocator, get_current_frame()._input_buffer.allocation, &particle_data);
 
     Particle* _input = (Particle*)particle_data;
 
@@ -198,27 +263,27 @@ void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float de
         _input[i + i] = *particles[i];
     }
 
-    vmaUnmapMemory(engine->_allocator, _input_buffer.allocation);
+    vmaUnmapMemory(engine->_allocator, get_current_frame()._input_buffer.allocation);
 
     _physics_input_descriptors = fluid_allocator.allocate(engine->_device, _physics_input_descriptor_layout);
     {
         DescriptorWriter writer;
-        writer.write_buffer(0, _input_buffer.buffer, sizeof(Particle) * PARTICLE_NUM * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        writer.write_buffer(0, get_current_frame()._input_buffer.buffer, sizeof(Particle) * PARTICLE_NUM * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         writer.update_set(engine->_device, _physics_input_descriptors);
     }
 
     _physics_output_descriptors = fluid_allocator.allocate(engine->_device, _physics_output_descriptor_layout);
 
-    vkCmdBindPipeline(engine->get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline);
+    vkCmdBindPipeline(get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline);
 
-    vkCmdBindDescriptorSets(engine->get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline_layout, 0, 1, &_physics_input_descriptors, 0, nullptr);
-    vkCmdBindDescriptorSets(engine->get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline_layout, 0, 1, &_physics_output_descriptors, 0, nullptr);
+    vkCmdBindDescriptorSets(get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline_layout, 0, 1, &_physics_input_descriptors, 0, nullptr);
+    vkCmdBindDescriptorSets(get_current_frame()._mainCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _physics_pipeline_layout, 0, 1, &_physics_output_descriptors, 0, nullptr);
 
-    vkCmdPushConstants(engine->get_current_frame()._mainCommandBuffer, _physics_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE, 0, sizeof(Config), &config_data);
+    vkCmdPushConstants(get_current_frame()._mainCommandBuffer, _physics_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE, 0, sizeof(Config), &config_data);
 
-    int groupcount = ((PARTICLE_NUM + 255) / 256);
+    int groupcount = ((PARTICLE_NUM + 255) >> 8);
 
-    vkCmdDispatch(engine->get_current_frame()._mainCommandBuffer, groupcount, 1, 1);
+    vkCmdDispatch(get_current_frame()._mainCommandBuffer, groupcount, 1, 1);
 
 
 

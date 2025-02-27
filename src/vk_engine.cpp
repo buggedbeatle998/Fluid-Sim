@@ -12,7 +12,6 @@
 #include <thread>
 
 #include <vk_images.h>
-#include <simu.h>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
@@ -469,6 +468,9 @@ void VulkanEngine::init_vulkan()
     // use vkbootstrap to get a Graphics queue
     _graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     _graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    _computeQueue = vkbDevice.get_queue(vkb::QueueType::compute).value();
+    _computeQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::compute).value();
 
     // initialize the memory allocator
     VmaAllocatorCreateInfo allocatorInfo = {};

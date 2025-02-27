@@ -11,7 +11,8 @@
 
 #include <camera.h>
 
-#define PARTICLE_NUM 2500
+#include <simu.h>
+
 
 
 struct DeletionQueue
@@ -190,6 +191,9 @@ public:
 
 	VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamily;
+
+	VkQueue _computeQueue;
+	uint32_t _computeQueueFamily;
 
 	DeletionQueue _mainDeletionQueue;
 
