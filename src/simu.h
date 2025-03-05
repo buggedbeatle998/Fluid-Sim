@@ -1,14 +1,13 @@
+#pragma once
+
+constexpr uint32_t PARTICLE_NUM = 2500;
+
 #include "VkBootstrap.h"
 #include <vk_engine.h>
 
-#define PARTICLE_NUM 2500
 
 
 class VulkanEngine;
-
-//class DescriptorAllocatorGrowable;
-//class VkDescriptorSet;
-//class VkDescriptorSetLayout;
 
 struct Config {
 	uint32_t particle_count{ 0 };
@@ -21,6 +20,24 @@ struct Particle {
 	float mass{ 1 };
 };
 
+struct FluidDeletionQueue
+{
+	std::deque<std::function<void()>> deletors;
+
+	void push_function(std::function<void()>&& function) {
+		deletors.push_back(function);
+	}
+
+	void flush() {
+		// reverse iterate the deletion queue to execute all the functions
+		for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+			(*it)(); //call functors
+		}
+
+		deletors.clear();
+	}
+};
+
 struct FluidFrameData {
 
 	VkCommandPool _commandPool;
@@ -29,7 +46,7 @@ struct FluidFrameData {
 	VkSemaphore _computeSemaphore;
 	VkFence _computeFence;
 
-	DeletionQueue _deletionQueue;
+	FluidDeletionQueue _deletionQueue;
 	DescriptorAllocatorGrowable _frameDescriptors;
 
 	AllocatedBuffer _input_buffer;
@@ -42,10 +59,10 @@ private:
 
 	VulkanEngine *engine;
 
-	DeletionQueue _mainDeletionQueue;
+	FluidDeletionQueue _mainDeletionQueue;
 
 	FluidFrameData _frames[FRAME_OVERLAP]{};
-	FluidFrameData& get_current_frame() { return _frames[engine->_frameNumber % FRAME_OVERLAP]; };
+	FluidFrameData& get_current_frame();
 
 	VkCommandPool _immCommandPool;
 	VkCommandBuffer _immCommandBuffer;
@@ -73,7 +90,7 @@ private:
 	void init_bounding_area(float right, float up, float left, float down);
 	void init_particles_square(float spacing);
 
-	void physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time);
+	void physics_step(uint32_t particle_count, float delta_time);
 	
 public:
 	void init(VulkanEngine *_engine);

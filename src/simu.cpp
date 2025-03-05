@@ -29,6 +29,8 @@ uint16_t isqrt(uint32_t num) {
 
 
 #pragma region Fluid
+FluidFrameData& Fluid::get_current_frame() { return _frames[engine->_frameNumber % FRAME_OVERLAP]; };
+
 #pragma region Inits
 void Fluid::init(VulkanEngine *_engine) {
     engine = _engine;
@@ -36,6 +38,15 @@ void Fluid::init(VulkanEngine *_engine) {
     init_buffers();
 
     init_bounding_area(4, -3, -4, 3);
+
+    init_commands();
+
+    init_syncs();
+
+    init_buffers();
+
+    init_physics_pipeline();
+
     init_particles_square(0.1f);
 }
 
@@ -137,30 +148,25 @@ void Fluid::init_buffers() {
 
 void Fluid::init_physics_pipeline()
 {
-    VkDescriptorSetLayout setLayouts[] = { _physics_input_descriptor_layout,
-                                           _physics_output_descriptor_layout };
-
-    VkPipelineLayoutCreateInfo computeLayout{};
-    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    computeLayout.pNext = nullptr;
-    computeLayout.pSetLayouts = setLayouts;
-    computeLayout.setLayoutCount = 1;
+    VkShaderModule physics_step_shader;
+    if (!vkutil::load_shader_module("../../shaders/physics_step.comp.spv", engine->_device, &physics_step_shader)) {
+        fmt::print("Error when building the compute shader \n");
+    }
 
     VkPushConstantRange pushConstant{};
     pushConstant.offset = 0;
     pushConstant.size = sizeof(Config);
     pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    VkDescriptorSetLayout setLayouts[] = { _physics_input_descriptor_layout, _physics_output_descriptor_layout };
+
+    VkPipelineLayoutCreateInfo computeLayout = vkinit::pipeline_layout_create_info();
+    computeLayout.pSetLayouts = setLayouts;
+    computeLayout.setLayoutCount = 2;
     computeLayout.pPushConstantRanges = &pushConstant;
     computeLayout.pushConstantRangeCount = 1;
 
     VK_CHECK(vkCreatePipelineLayout(engine->_device, &computeLayout, nullptr, &_physics_pipeline_layout));
-
-
-    VkShaderModule physics_step_shader;
-    if (!vkutil::load_shader_module("../../shaders/physics_step.comp.spv", engine->_device, &physics_step_shader)) {
-        fmt::print("Error when building the compute shader \n");
-    }
 
     VkPipelineShaderStageCreateInfo stageinfo{};
     stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -197,6 +203,12 @@ void Fluid::init_particles_square(float spacing) {
         
         particles[i] = new_part;
 	}
+
+    _mainDeletionQueue.push_function([&] {
+        for (auto& particle : particles) {
+            delete particle;
+        }
+    });
 }
 
 void Fluid::set_particles_square(float spacing) {
@@ -214,32 +226,21 @@ void Fluid::set_particles_square(float spacing) {
 
 #pragma region Step
 void Fluid::step(uint32_t particle_count, float delta_time) {
+    physics_step(particle_count, delta_time);
+}
+
+void Fluid::physics_step(uint32_t particle_count, float delta_time) {
     get_current_frame()._deletionQueue.flush();
     get_current_frame()._frameDescriptors.clear_pools(engine->_device);
 
     VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
-    
+
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
-
-    physics_step(cmd, particle_count, delta_time);
-
-    VK_CHECK(vkEndCommandBuffer(cmd));
-
-    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
-
-    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, get_current_frame()._computeSemaphore);
-
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
-
-    VK_CHECK(vkQueueSubmit2(engine->_computeQueue, 1, &submit, nullptr));
-}
-
-void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float delta_time) {
 
     Config config_data{};
     config_data.particle_count = particle_count;
@@ -253,22 +254,24 @@ void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float de
         writer.update_set(engine->_device, _physics_config_descriptors);
     }*/
 
-    void* particle_data;
-    vmaMapMemory(engine->_allocator, get_current_frame()._input_buffer.allocation, &particle_data);
-
-    Particle* _input = (Particle*)particle_data;
-
-    for (uint32_t i = 0; i < PARTICLE_NUM; i++)
     {
-        _input[i + i] = *particles[i];
-    }
+        void* particle_data;
+        vmaMapMemory(engine->_allocator, get_current_frame()._input_buffer.allocation, &particle_data);
 
-    vmaUnmapMemory(engine->_allocator, get_current_frame()._input_buffer.allocation);
+        Particle* _input = (Particle*)particle_data;
+
+        for (uint32_t i = 0; i < particle_count; i++)
+        {
+            _input[i + i] = *particles[i];
+        }
+
+        vmaUnmapMemory(engine->_allocator, get_current_frame()._input_buffer.allocation);
+    }
 
     _physics_input_descriptors = fluid_allocator.allocate(engine->_device, _physics_input_descriptor_layout);
     {
         DescriptorWriter writer;
-        writer.write_buffer(0, get_current_frame()._input_buffer.buffer, sizeof(Particle) * PARTICLE_NUM * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        writer.write_buffer(0, get_current_frame()._input_buffer.buffer, sizeof(Particle) * particle_count * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         writer.update_set(engine->_device, _physics_input_descriptors);
     }
 
@@ -281,18 +284,41 @@ void Fluid::physics_step(VkCommandBuffer &cmd, uint32_t particle_count, float de
 
     vkCmdPushConstants(get_current_frame()._mainCommandBuffer, _physics_pipeline_layout, VK_PIPELINE_BIND_POINT_COMPUTE, 0, sizeof(Config), &config_data);
 
-    int groupcount = ((PARTICLE_NUM + 255) >> 8);
+    int groupcount = ((particle_count + 255) >> 8);
 
     vkCmdDispatch(get_current_frame()._mainCommandBuffer, groupcount, 1, 1);
 
+    VK_CHECK(vkEndCommandBuffer(cmd));
 
+    VkSubmitInfo submit{};
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &get_current_frame()._mainCommandBuffer;
+    submit.signalSemaphoreCount = 1;
+    submit.pSignalSemaphores = &get_current_frame()._computeSemaphore;
 
+    VK_CHECK(vkQueueSubmit(engine->_computeQueue, 1, &submit, get_current_frame()._computeFence));
+
+    vkWaitForFences(engine->_device, 1, &get_current_frame()._computeFence, VK_TRUE, 1000000000);
+
+    vkResetFences(engine->_device, 1, &get_current_frame()._computeFence);
+
+    {
+        void* particle_data;
+        vmaMapMemory(engine->_allocator, get_current_frame()._output_buffer.allocation, &particle_data);
+
+        Particle* _output = (Particle*)particle_data;
+
+        for (uint32_t i = 0; i < particle_count; i++)
+        {
+            *particles[i] = _output[i + i];
+        }
+
+        vmaUnmapMemory(engine->_allocator, get_current_frame()._output_buffer.allocation);
+    }
 }
 #pragma endregion Step
 
 void Fluid::cleanup() {
-    for (auto& particle : particles) {
-        delete particle;
-    }
+    _mainDeletionQueue.flush();
 }
 #pragma endregion Fluid

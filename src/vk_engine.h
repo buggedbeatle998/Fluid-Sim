@@ -2,6 +2,7 @@
 // or project specific include files.
 
 #pragma once
+constexpr uint32_t FRAME_OVERLAP = 2;
 
 #include <vk_types.h>
 
@@ -135,7 +136,6 @@ struct EngineStats {
 
 class Fluid;
 
-constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
 public:

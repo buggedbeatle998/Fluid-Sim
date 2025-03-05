@@ -1776,9 +1776,9 @@ void VulkanEngine::run()
         draw();
 
         deltaTime = (SDL_GetTicks() - lastTime) / 1000.f;
-
         lastTime = SDL_GetTicks();
-        //fluid->set_particles_square(0.1);
+
+        fluid->step(PARTICLE_NUM, deltaTime);
 
         //get clock again, compare with start clock
         auto end = std::chrono::system_clock::now();
